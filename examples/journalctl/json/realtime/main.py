@@ -2,7 +2,6 @@ import json
 import sys
 import functools
 import operator
-import time
 import struct
 
 partial = functools.partial
