@@ -1,5 +1,9 @@
 package filter
 
+import (
+	"github.com/takanoriyanagitani/go-log-filter/util"
+)
+
 type Transform[T any] func([]byte) (T, error)
 type SkipTransformed[T any] func(T) (skip bool)
 type ConsumeTransformed[T any] func(T) error
@@ -32,4 +36,11 @@ func (t Transform[T]) ProcessorNew(s SkipTransformed[T]) func(ConsumeTransformed
 		var bc BytesConsumer = t.BytesConsumerNew(c)
 		return BytesProcessorNew(sb)(bc)
 	}
+}
+
+func TransformAdd[T, U any](original Transform[T], conv func(T) (U, error)) Transform[U] {
+	return util.Compose(
+		original,
+		conv,
+	)
 }
