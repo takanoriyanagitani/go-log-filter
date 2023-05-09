@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 	"os"
 	"runtime"
 	"strconv"
@@ -22,11 +23,13 @@ var json = jsonit.ConfigCompatibleWithStandardLibrary
 var ErrInvalidRealtime = errors.New("invalid realtime")
 var ErrInvalidMemory = errors.New("invalid memory")
 var ErrInvalidModule = errors.New("invalid module")
+var ErrInvalidNumber = errors.New("invalid number")
 
 type wtInstance struct {
 	i *wasmtime.Instance
 	f *wasmtime.Func
 	s wasmtime.Storelike
+	a int32
 }
 
 type wtModule struct {
@@ -61,6 +64,20 @@ func (m wtModule) newInstance() (*wasmtime.Instance, error) {
 	return wasmtime.NewInstance(m.s, m.m, nil)
 }
 
+func (m wtModule) getAddr(f *wasmtime.Func) (int32, error) {
+	return util.Compose(
+		func(s wasmtime.Storelike) (any, error) { return f.Call(s) },
+		func(i any) (int32, error) {
+			switch addr := i.(type) {
+			case int32:
+				return addr, nil
+			default:
+				return -1, ErrInvalidModule
+			}
+		},
+	)(m.s)
+}
+
 func (m wtModule) toInstance(name string) (wtInstance, error) {
 	i, e := m.newInstance()
 	if nil != e {
@@ -70,11 +87,20 @@ func (m wtModule) toInstance(name string) (wtInstance, error) {
 	if nil == f {
 		return wtInstance{}, ErrInvalidModule
 	}
+	var addrFn *wasmtime.Func = i.GetFunc(m.s, "addr")
+	if nil == addrFn {
+		return wtInstance{}, ErrInvalidModule
+	}
+	a, e := m.getAddr(addrFn)
+	if nil != e {
+		return wtInstance{}, e
+	}
 	var s wasmtime.Storelike = m.s
 	return wtInstance{
 		i,
 		f,
 		s,
+		a,
 	}, nil
 }
 
@@ -83,16 +109,32 @@ func (m wtModule) toTransformer(name string) (lf.Transform[float64], error) {
 	return i.asTransform(), e
 }
 
-func (wi wtInstance) realtime() (float64, error) {
-	i, e := wi.f.Call(wi.s)
-	if nil != e {
-		return 0.0, e
-	}
+func (wi wtInstance) any2f64(i any) (float64, error) {
 	switch f := i.(type) {
 	case float64:
 		return f, nil
 	default:
 		return 0.0, ErrInvalidRealtime
+	}
+}
+
+func (wi wtInstance) realtime(size int) (float64, error) {
+	var sz int32 = int32(size) & 0xffff
+	return util.Compose(
+		func(s wasmtime.Storelike) (any, error) { return wi.f.Call(s, sz) },
+		util.Compose(
+			wi.any2f64,
+			wi.f2f,
+		),
+	)(wi.s)
+}
+
+func (wi wtInstance) f2f(f float64) (float64, error) {
+	switch math.IsNaN(f) {
+	case true:
+		return math.NaN(), ErrInvalidNumber
+	default:
+		return f, nil
 	}
 }
 
@@ -107,8 +149,9 @@ func (wi wtInstance) toRealtime(raw []byte) (float64, error) {
 	}
 	var max int = len(raw) & 0xffff
 	var dst []byte = mem.UnsafeData(wi.s)
-	copy(dst, raw[:max])
-	f, e := wi.realtime()
+	var offset int = int(wi.a)
+	copy(dst[offset:], raw[:max])
+	f, e := wi.realtime(len(raw))
 	runtime.KeepAlive(mem)
 	return f, e
 }
