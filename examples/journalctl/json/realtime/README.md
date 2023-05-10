@@ -3,6 +3,7 @@
 - golang wasmtime: go1.20.4 darwin/arm64 & wasmtime 8.0.0
 - golang native:   go1.20.4 darwin/arm64
 - python native:   Python 3.10.10
+- rust   native:   Rust 1.69.0 & serde json 1.0.96
 
 | type            | user  | sys | cpu  | total | jsons / second | ratio | MiB / s |
 |:---------------:|:-----:|:---:|:----:|:-----:|:--------------:|:-----:|:-------:|
