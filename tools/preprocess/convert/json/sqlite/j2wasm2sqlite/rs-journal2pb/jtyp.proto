@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package example.log.journalctl;
+
+message Log {
+  map<string, string> items = 1;
+}
