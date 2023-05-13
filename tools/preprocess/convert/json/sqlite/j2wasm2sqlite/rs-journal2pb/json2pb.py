@@ -1,6 +1,5 @@
 import json
 import functools
-import operator
 import sys
 import sqlite3
 
@@ -51,8 +50,7 @@ with sqlite3.connect("./journalctl.sqlite3.db") as con:
             functools.partial(map, j2l),
             functools.partial(map, l2s),
             functools.partial(map, bytes2dict),
-            lambda items: i2s(items),
-            print,
+            i2s,
         ],
         sys.stdin,
     )
