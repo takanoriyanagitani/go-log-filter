@@ -1,10 +1,15 @@
 package util
 
 func ifOk[T any](valid bool, ok func() (T, error), ng func() (T, error)) (T, error) {
-	switch valid {
+	var f func() (T, error) = Select(ng, ok, valid)
+	return f()
+}
+
+func Select[T any](f T, t T, cond bool) T {
+	switch cond {
 	case true:
-		return ok()
+		return t
 	default:
-		return ng()
+		return f
 	}
 }
