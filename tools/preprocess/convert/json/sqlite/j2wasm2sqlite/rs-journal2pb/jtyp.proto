@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package example.log.journalctl;
 
+option go_package = "protobuf/journalctl/easymap";
+
 message Log {
   map<string, string> items = 1;
 }
